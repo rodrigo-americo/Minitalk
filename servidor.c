@@ -1,82 +1,91 @@
-#include <unistd.h>
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   servidor.c                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: rgregori <rgregori@student.42sp.org.br>    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/09/26 15:29:51 by rgregori          #+#    #+#             */
+/*   Updated: 2025/09/26 15:29:52 by rgregori         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <signal.h>
-#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
 
-void signal_handler(int signum, siginfo_t *info, void *context)
+static void	ft_putpid(pid_t pid)
 {
-    static int client_pid = 0;
+	char	buf[32];
+	int		i;
+	long	n;
 
-     if (client_pid == 0)
-    {
-        client_pid = info->si_pid;
-    }
-    // Se o sinal for SIGUSR2, o bit é 1.
-    if (signum == SIGUSR2)
-        current_char |= 1;
-
-    // Incrementa a contagem de bits recebidos
-    current_bit++;
-
-    // Quando 8 bits foram recebidos, o caractere está completo
-    if (current_bit == 8)
-    {
-        if (current_char == '\0') // Se for o caractere nulo, a string terminou
-        {
-            printf("\n");
-        }
-        else
-        {
-            printf("%c", current_char);
-        }
-        // Reseta as variáveis para o próximo caractere
-        current_bit = 0;
-        current_char = 0;
-    }
+	write(1, "Server PID: ", 12);
+	n = (long)pid;
+	if (n == 0)
+		write(1, "0", 1);
+	i = 0;
+	while (n > 0)
+	{
+		buf[i++] = '0' + (n % 10);
+		n /= 10;
+	}
+	while (i--)
+		write(1, &buf[i], 1);
+	write(1, "\n", 1);
 }
 
-int main(void)
+static void	ft_helper_sinal(int signum, siginfo_t *info, pid_t *pid_active)
 {
-    struct sigaction sa;
+	static unsigned char	current_char = 0;
+	static int				current_bit = 0;
 
-    // Limpa a estrutura para evitar valores aleatórios
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-
-    // Registra o handler para SIGUSR1 e SIGUSR2
-    if (sigaction(SIGUSR1, &sa, NULL) == -1 || sigaction(SIGUSR2, &sa, NULL) == -1)
-    {
-        printf("Error configuring signal handler.\n");
-        return (1);
-    }
-    printf("Server PID: %d\n", getpid());
-    while (1)
-    {
-        pause();
-    }
-
-    return (0);
+	if (signum == SIGUSR2)
+		current_char |= (1 << (7 - current_bit));
+	current_bit++;
+	if (current_bit == 8)
+	{
+		if (current_char == '\0')
+			write(1, "\n", 1);
+		else
+			write(1, &current_char, 1);
+		kill(info->si_pid, SIGUSR1);
+		if (current_char == '\0')
+			*pid_active = 0;
+		current_bit = 0;
+		current_char = 0;
+	}
 }
 
-int main(void)
+static void	signal_handler(int signum, siginfo_t *info, void *context)
 {
-    struct sigaction sa;
+	static pid_t	client_pid = 0;
 
-    sa.sa_flags = SA_SIGINFO; // Use SA_SIGINFO para obter informações detalhadas
-    sa.sa_sigaction = signal_handler; // A função agora é sa_sigaction
-    sigemptyset(&sa.sa_mask);
+	(void)context;
+	if (client_pid == 0)
+		client_pid = info->si_pid;
+	if (info->si_pid == client_pid)
+		ft_helper_sinal(signum, info, &client_pid);
+	else
+		kill(info->si_pid, SIGUSR2);
+}
 
-    if (sigaction(SIGUSR1, &sa, NULL) == -1 || sigaction(SIGUSR2, &sa, NULL) == -1)
-    {
-        printf("Error configuring signal handler.\n");
-        return (1);
-    }
-    
-    printf("Server PID: %d\n", getpid());
-    
-    while (1)
-    {
-        pause();
-    }
-    return (0);
+int	main(void)
+{
+	struct sigaction	sa;
+
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = signal_handler;
+	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGUSR1);
+	sigaddset(&sa.sa_mask, SIGUSR2);
+	if (sigaction(SIGUSR1, &sa, 0) == -1 || sigaction(SIGUSR2, &sa, 0) == -1)
+	{
+		write(2, "Erro ao configurar handler.\n", 28);
+		return (1);
+	}
+	ft_putpid(getpid());
+	while (1)
+		pause();
+	return (0);
 }
