@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   servidor.c                                         :+:      :+:    :+:   */
+/*   server.c                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rgregori <rgregori@student.42sp.org.br>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/26 15:29:51 by rgregori          #+#    #+#             */
-/*   Updated: 2025/09/26 15:29:52 by rgregori         ###   ########.fr       */
+/*   Updated: 2025/09/30 14:45:46 by rgregori         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,12 +49,12 @@ static void	ft_helper_sinal(int signum, siginfo_t *info, pid_t *pid_active)
 			write(1, "\n", 1);
 		else
 			write(1, &current_char, 1);
-		kill(info->si_pid, SIGUSR1);
 		if (current_char == '\0')
 			*pid_active = 0;
 		current_bit = 0;
 		current_char = 0;
 	}
+	kill(info->si_pid, SIGUSR1);
 }
 
 static void	signal_handler(int signum, siginfo_t *info, void *context)
@@ -74,11 +74,9 @@ int	main(void)
 {
 	struct sigaction	sa;
 
+	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO;
 	sa.sa_sigaction = signal_handler;
-	sigemptyset(&sa.sa_mask);
-	sigaddset(&sa.sa_mask, SIGUSR1);
-	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, 0) == -1 || sigaction(SIGUSR2, &sa, 0) == -1)
 	{
 		write(2, "Erro ao configurar handler.\n", 28);
